@@ -1,0 +1,23 @@
+# EXPERIMENT 9 — Render Blueprint (infrastructure as code for the backend).
+# Render → New → Blueprint → pick this repo. MongoDB is provided by
+# MongoDB Atlas (free tier): paste its connection string as MONGO_URI.
+services:
+  - type: web
+    name: roadresq-api
+    runtime: docker
+    dockerfilePath: ./roadresq-backend/Dockerfile
+    dockerContext: ./roadresq-backend
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: false          # deploys are triggered by GitHub Actions (deploy.yml)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false            # secret — set in the Render dashboard (Atlas URI)
+      - key: JWT_SECRET
+        generateValue: true    # Render generates a strong random secret
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false            # your Vercel URL, e.g. https://roadresq.vercel.app

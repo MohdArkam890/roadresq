@@ -1,0 +1,71 @@
+# EXPERIMENT 10 — full-stack deployment with Docker
+#
+#   docker compose up --build                      # start everything
+#   docker compose run --rm seed                   # load demo users (optional)
+#   docker compose down            (-v also wipes the database volume)
+#
+# Frontend → http://localhost:8080   (Nginx; proxies /api and /socket.io)
+# API      → http://localhost:5000/api
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # bound to localhost only — the database is not exposed to the network
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  backend:
+    build: ./roadresq-backend
+    restart: unless-stopped
+    environment:
+      PORT: "5000"
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/roadresq
+      # set a real secret for anything but a throwaway demo:
+      #   JWT_SECRET=$(openssl rand -hex 32) docker compose up --build
+      JWT_SECRET: ${JWT_SECRET:-change_this_in_production_please}
+      JWT_EXPIRES_IN: 7d
+      # the browser reaches the API through Nginx (same origin), but allow
+      # direct calls from the published frontend port too
+      CORS_ORIGIN: http://localhost:8080
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./roadresq
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:5000
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # one-shot helper: docker compose run --rm seed
+  seed:
+    build: ./roadresq-backend
+    profiles: ["tools"]
+    command: ["node", "scripts/seed.js"]
+    environment:
+      MONGO_URI: mongodb://mongo:27017/roadresq
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
