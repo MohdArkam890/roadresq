@@ -1,6 +1,6 @@
 # EXPERIMENT 10 — backend image
 # Small, reproducible, and not running as root.
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
